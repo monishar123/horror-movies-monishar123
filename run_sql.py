@@ -98,4 +98,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+  git clone [gh repo clone monishar123/horror-movies-monishar123]
+  main()
