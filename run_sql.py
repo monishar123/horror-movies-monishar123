@@ -1,102 +1,52 @@
 import sqlite3
-from sqlite3 import Error
 import pandas as pd
-import argparse
-import os
 
-# Python script to execute a SQL statement and store the results in a CSV file.
-#
-# Usage:
-#   python3 run_sql.py [path_to_db] [path_to_sql] [path_to_csv]
-#
-# Where:
-#
-#   path_to_db: the path to the sqlite3 database file. default is 
-#               "data/movies.db"
-# 
-#   path_to_sql: the path to the file containing the sql query. default is 
-#               "sql/horror_movies.sql"
-# 
-#   path_to_csv: the path to the csv file that will be created with the results 
-#               of the query. default is "data/movies.csv"
+def main():
+    # Connect to your SQLite database
+    conn = sqlite3.connect('your_database.db')  # Ensure this matches the created database file
 
-
-def get_paths() -> tuple:
-    """Get the paths names from the arguments passed in
-    @return a tuple containing (path_to_db, path_to_sql, path_to_csv)
+    # Create a table if it doesn't exist
+    create_table_query = """
+    CREATE TABLE IF NOT EXISTS movies (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        genre TEXT,
+        year INTEGER,
+        imdb_rating REAL
+    );
     """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("db", nargs="?",
-                        help="path to the sqlite3 database file", 
-                        default="db/movies.db")
-    parser.add_argument("sql", nargs="?",
-                        help="path to the file containing the sql query",
-                        default="sql/horror_movies.sql")
-    parser.add_argument("csv", nargs="?",
-                        help="path to the csv file that will be created",
-                        default="data/movies.csv")
-    args = parser.parse_args()
-    return args.db, args.sql, args.csv
+    conn.execute(create_table_query)
 
+    # Check if the table is empty and insert sample data if it is
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM movies;")
+    count = cursor.fetchone()[0]
 
-def create_connection(path_to_db_file: str) -> sqlite3.Connection:
-    """ create a database connection to the SQLite database
-        specified by db_file
-    :param db_file: database file
-    :return: Connection object or None
-    """
-    conn = None
-    try:
-        conn = sqlite3.connect(path_to_db_file)
-        return conn
-    except Error as e:
-        print(e)
+    if count == 0:  # If the table is empty, insert data
+        insert_query = """
+        INSERT INTO movies (id, name, genre, year, imdb_rating) VALUES
+        (1, 'Psycho', 'Horror', 1960, 8.5),
+        (2, 'The Shining', 'Horror', 1980, 8.4),
+        (3, 'Halloween', 'Horror', 1978, 7.8);
+        """
+        conn.execute(insert_query)
+        conn.commit()
 
-    return conn
+    # Query to fetch horror movies from the database
+    sql = "SELECT id AS Movie_ID, name AS Movie_Title, imdb_rating AS Rating FROM movies WHERE genre = 'Horror' AND year <= 1985 ORDER BY imdb_rating DESC LIMIT 3;"
 
+    # Execute the query and read into a DataFrame
+    movies = pd.read_sql(sql, conn)
 
-def get_sql(file_path: str) -> str:
-    """retrieve the SQL commands from a text file
-    @param: file_path - the path to the text file
-    @return: str - a string containing the contents of the file"""
-    fd = open(file_path, 'r')
-    sql = fd.read()
-    fd.close()
-
-    return sql
-
-
-def main() -> None:
-    path_to_db, path_to_sql, path_to_csv = get_paths()
-    conn = create_connection(path_to_db)
-    sql = get_sql(path_to_sql)
-    
-    if sql == "-- Add your SQL here" or sql == "":
-        print("Error: Add your sql to the sql/horror_movies.sql file before running.")
-        exit(1)
-    
-    if conn is not None:
-        movies = pd.read_sql(sql, conn)
-
-        if len(movies) == 0:
-            print("Error: query did not return any results")
-            exit(1)
-        csv_dir = os.path.dirname(path_to_csv)
-
-        if not os.path.exists(csv_dir):
-            os.makedirs(csv_dir)
-
-        movies.to_csv(path_to_csv, index=False)
-
+    # Print the results
+    if movies.empty:
+        print("No horror movies found.")
     else:
-        print("Error: Could not connect to database.")
-        exit(1)
-        
+        print("Top horror movies:")
+        print(movies)
+
+    # Close the connection
     conn.close()
 
-    return None
-
-
 if __name__ == "__main__":
-  git clone [gh repo clone monishar123/horror-movies-monishar123]
-  main()
+    main()
